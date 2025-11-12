@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Newspaper Reader</title>
+
+    <!-- CRITICAL STEP 1: Load Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- CRITICAL STEP 2: Custom styles for full-screen behavior -->
+    <style>
+      /* Ensure full height and remove browser defaults */
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Prevents scrollbars when resizing */
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The #root element is where your App.jsx is rendered -->
+    <div id="root"></div>
+    <!-- Make sure this path correctly points to your main entry point -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
