@@ -68,7 +68,7 @@ export const summarizeArticle = async (articleBody, userApiKey) => {
     systemInstruction: {
       parts: [
         {
-          text: "You are a helpful reading assistant. Summarize the provided text accurately. Format the summary using Markdown bullet points.",
+          text: "You are a helpful reading assistant. Summarize the provided text accurately. Firstly, mention the UPSC paper (GS1,GS2,GS3,GS4, not required for UPSC). Mention the Optional paper it might be useful for. Format the summary using Markdown bullet points.",
         },
       ],
     },
