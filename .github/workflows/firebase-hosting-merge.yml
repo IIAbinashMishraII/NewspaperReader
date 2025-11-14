@@ -11,10 +11,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: vite build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      
+      # 1. CRITICAL: Setup Node.js environment
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use a modern version for Vite
+
+      # 2. CRITICAL: Install dependencies and run the Vite build
+      - name: Install dependencies and build project
+        run: |
+          npm install
+          npm run build
+
+      # 3. Deploy the built content (files are in 'dist' folder by default)
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_NP_READER }}
           channelId: live
           projectId: np-reader
+          # NOTE: The Firebase action assumes the deploy folder (dist) is configured 
+          # correctly in your firebase.json file.
