@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { db, appIdentifier } from "./config/firebase";
 import { useAuth } from "./hooks/useAuth";
 import { useFirestore } from "./hooks/useFirestore";
-import { usePdfProcessing, fileToBase64 } from "./hooks/usePdfProcessing";
+import { usePdfProcessing } from "./hooks/usePdfProcessing";
 import { useDarkMode } from "./hooks/useDarkMode";
 import { extractArticlesFromPage, summarizeArticle } from "./services/extractionService";
 import { incrementExtractionCounter } from "./services/trackingService";
