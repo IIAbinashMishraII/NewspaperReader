@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { db, appIdentifier } from "./config/firebase";
 import { useAuth } from "./hooks/useAuth";
 import { useFirestore } from "./hooks/useFirestore";
-import { usePdfProcessing } from "./hooks/usePdfProcessing";
+import { usePdfProcessing, fileToBase64 } from "./hooks/usePdfProcessing";
+import { useDarkMode } from "./hooks/useDarkMode";
 import { extractArticlesFromPage, summarizeArticle } from "./services/extractionService";
 import { incrementExtractionCounter } from "./services/trackingService";
+import { incrementArticleCount, updateTimeSpent } from "./services/readingStatsService";
 import { Header } from "./components/Header";
 import { LoginPage } from "./components/LoginPage";
 import { SettingsPage } from "./components/SettingsPage";
@@ -14,6 +16,9 @@ import { VIEWS, MOBILE_TABS } from "./constants/schemas";
 import { LoaderIcon, FileTextIcon } from "./icons/Icons";
 
 const App = () => {
+  // Dark mode
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
+
   // Auth state
   const {
     user,
@@ -56,6 +61,10 @@ const App = () => {
   // Mobile state
   const [mobileActiveTab, setMobileActiveTab] = useState(MOBILE_TABS.DOCUMENT);
 
+  // Time tracking state
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [timeSpentToday, setTimeSpentToday] = useState(0);
+
   // Fetch API key on user login
   useEffect(() => {
     if (user) {
@@ -65,6 +74,9 @@ const App = () => {
           console.error(err);
           setError(err.message);
         });
+
+      // Start session timer
+      setSessionStartTime(Date.now());
     }
   }, [user, fetchUserApiKey]);
 
@@ -80,6 +92,40 @@ const App = () => {
       }
     }
   }, [isAuthReady, user, userApiKey]);
+
+  // Track time spent - update every 30 seconds
+  useEffect(() => {
+    if (!user || currentView !== VIEWS.MAIN) return;
+
+    const interval = setInterval(async () => {
+      if (sessionStartTime) {
+        const elapsedSeconds = Math.floor((Date.now() - sessionStartTime) / 1000);
+        setTimeSpentToday((prev) => prev + elapsedSeconds);
+
+        // Save to Firestore every 30 seconds
+        if (elapsedSeconds >= 30) {
+          await updateTimeSpent(db, user.uid, appIdentifier, elapsedSeconds);
+          setSessionStartTime(Date.now()); // Reset timer
+        }
+      }
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user, sessionStartTime, currentView]);
+
+  // Save remaining time when user logs out or leaves
+  useEffect(() => {
+    return () => {
+      if (sessionStartTime && user && currentView === VIEWS.MAIN) {
+        const elapsedSeconds = Math.floor((Date.now() - sessionStartTime) / 1000);
+        if (elapsedSeconds > 0) {
+          updateTimeSpent(db, user.uid, appIdentifier, elapsedSeconds).catch((err) =>
+            console.error("Error saving final time:", err)
+          );
+        }
+      }
+    };
+  }, [sessionStartTime, user, currentView]);
 
   // Save API key
   const handleSaveApiKey = useCallback(
@@ -160,6 +206,9 @@ const App = () => {
         setError(
           `Extraction started! ${firstPageArticles.length} articles found on Page 1. Reading enabled.`
         );
+
+        // Update reading stats
+        await incrementArticleCount(db, user.uid, appIdentifier, firstPageArticles.length);
       } else {
         setArticles([]);
         setError(
@@ -189,6 +238,9 @@ const App = () => {
                   return [...prev, ...newArticles];
                 });
                 setError(`Page ${i + 1} complete. Total articles now: ${successCount}.`);
+
+                // Update stats for each page
+                await incrementArticleCount(db, user.uid, appIdentifier, newArticles.length);
               }
             } catch (e) {
               console.error(`Background processing failed for Page ${i + 1}:`, e);
@@ -304,6 +356,9 @@ const App = () => {
           error={error}
           onSave={handleSaveApiKey}
           onBack={() => setCurrentView(VIEWS.MAIN)}
+          db={db}
+          user={user}
+          appIdentifier={appIdentifier}
         />
       );
       break;
@@ -344,18 +399,24 @@ const App = () => {
     case VIEWS.LOADING:
     default:
       content = (
-        <div className="flex flex-col items-center justify-center h-full text-gray-600 bg-gray-50">
+        <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
           <LoaderIcon className="w-10 h-10 animate-spin mb-4 text-blue-500" />
           <p className="text-lg font-medium">Loading authentication...</p>
-          {error && <p className="text-sm text-red-500 mt-4 p-2 bg-red-100 rounded">{error}</p>}
+          {error && (
+            <p className="text-sm text-red-500 dark:text-red-400 mt-4 p-2 bg-red-100 dark:bg-red-900 rounded">
+              {error}
+            </p>
+          )}
         </div>
       );
   }
 
   return (
-    <div className="w-screen h-screen bg-gray-100 flex flex-col">
+    <div className="w-screen h-screen bg-gray-100 dark:bg-gray-900 flex flex-col transition-colors duration-200">
       <Header
         user={user}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
         onSettingsClick={() => setCurrentView(VIEWS.SETTINGS)}
         onSignOut={() => {
           handleSignOut();
@@ -363,6 +424,8 @@ const App = () => {
           setRenderedPages([]);
           setFile(null);
           setError("");
+          setSessionStartTime(null);
+          setTimeSpentToday(0);
         }}
       />
       <div className="flex-grow w-full h-full">{content}</div>
